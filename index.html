@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{
+    margin:0;
+    overflow:hidden;
+    background:black;
+    color:white;
+    font-family: Arial;
+}
+
+/* BALL */
+#ball{
+    position:absolute;
+    border-radius:50%;
+    outline:#FFF dashed 10px;
+    background: radial-gradient(#fff7a7,#ffd100);
+    width:120px;
+    height:120px;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    transition: left 0.05s linear, top 0.05s linear;
+    pointer-events:none;
+}
+
+/* INFO */
+#report_box{
+    position:fixed;
+    top:10px;
+    left:10px;
+    font-size:14px;
+}
+
+/* BUTTON */
+#startBtn{
+    position:fixed;
+    bottom:20px;
+    left:50%;
+    transform:translateX(-50%);
+    padding:12px 25px;
+    font-size:16px;
+    border:none;
+    border-radius:8px;
+    background:#22c55e;
+    color:white;
+}
+</style>
+</head>
+
+<body>
+
+<div id="report_box">Click Start</div>
+<div id="ball"></div>
+<button id="startBtn">Start Sensor</button>
+
+<script>
+const ball = document.getElementById("ball");
+const report_box = document.getElementById("report_box");
+const startBtn = document.getElementById("startBtn");
+
+let posX = window.innerWidth / 2;
+let posY = window.innerHeight / 2;
+const speed = 0.5;
+
+// clamp function
+function clamp(v, min, max){
+    return Math.max(min, Math.min(max, v));
+}
+
+// start button
+startBtn.onclick = async () => {
+
+    // iPhone permission
+    if (typeof DeviceOrientationEvent.requestPermission === "function") {
+        try{
+            const res = await DeviceOrientationEvent.requestPermission();
+            if(res !== "granted"){
+                alert("Permission denied");
+                return;
+            }
+        }catch(e){
+            alert("Permission error");
+            return;
+        }
+    }
+
+    startTracking();
+};
+
+function startTracking(){
+
+    startBtn.style.display = "none";
+
+    window.addEventListener("deviceorientation", (event) => {
+
+        let tiltX = event.gamma || 0; // left/right
+        let tiltY = event.beta || 0;  // forward/back
+
+        // move ball
+        posX += tiltX * speed;
+        posY += tiltY * speed;
+
+        let maxX = window.innerWidth - ball.offsetWidth;
+        let maxY = window.innerHeight - ball.offsetHeight;
+
+        posX = clamp(posX, 0, maxX);
+        posY = clamp(posY, 0, maxY);
+
+        ball.style.left = posX + "px";
+        ball.style.top = posY + "px";
+
+        // 🔥 SEND TO NODEMCU
+        let motorSpeed = Math.abs(tiltY);
+
+        fetch(`http://192.168.4.1/control?tilt=${tiltX}&speed=${motorSpeed}`)
+        .catch(()=>{}); // ignore errors
+
+        // debug
+        report_box.innerHTML = `
+            TiltX: ${tiltX.toFixed(2)}<br>
+            Speed: ${motorSpeed.toFixed(2)}
+        `;
+    });
+}
+</script>
+
+</body>
+</html>
