@@ -28,13 +28,14 @@ body {
     justify-content: center;
     align-items: flex-start;
     padding-top: 50px;
+    perspective: 800px; /* 🔥 important for 3D tilt */
 }
 
 model-viewer {
     height: 250px;
     width: 250px;
     transition: transform 0.1s linear;
-    pointer-events: none; 
+    pointer-events: none;
 }
 </style>
 </head>
@@ -70,15 +71,19 @@ if (typeof DeviceOrientationEvent.requestPermission === "function") {
 
 window.addEventListener("deviceorientation", (event) => {
 
-    let tiltX = event.gamma || 0;
+    let tiltX = event.gamma || 0; // ONLY left/right
 
-    // smooth motion
+    // smooth
     smoothX = smoothX * 0.9 + tiltX * 0.1;
 
-    let roll = Math.max(-45, Math.min(45, smoothX));
+    // limit tilt
+    let bank = Math.max(-40, Math.min(40, smoothX));
 
-    // ✈️ tilt only (no manual rotation possible)
-    plane.style.transform = `rotateZ(${roll}deg)`;
+    // ✈️ REAL AIRCRAFT TILT (NOT SPIN)
+    plane.style.transform = `
+        rotateY(${bank}deg) 
+        rotateX(5deg)
+    `;
 
 });
 </script>
