@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-widthdiv, initial-scale=1.0">
-    <title>Document</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plane Gyro Control</title>
 
     <style>
         * {
@@ -33,8 +33,24 @@
             height: 250px;
             width: 250px;
         }
+
+        /* Start Button */
+        #startBtn{
+            position:fixed;
+            bottom:20px;
+            left:50%;
+            transform:translateX(-50%);
+            padding:10px 20px;
+            border:none;
+            border-radius:6px;
+            background:#22c55e;
+            color:white;
+            font-size:16px;
+            z-index:10;
+        }
     </style>
 </head>
+
 <body>
 
 <div class="model-container">
@@ -42,53 +58,62 @@
         alt="3d model"
         src="plane.glb"
         autoplay 
-        touch-action="pan-y"
+        touch-action="none"   <!-- disable touch -->
         disable-zoom
-        camera-orbit="25deg 75deg 105%"
+        camera-orbit="20deg 75deg 105%"
         min-camera-orbit="auto 75deg auto"
         max-camera-orbit="auto 75deg auto">   
     </model-viewer>
 </div>
 
+<button id="startBtn">Start</button>
+
+<!-- model-viewer -->
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.2.0/model-viewer.min.js"></script>
 
 <script>
 const viewer = document.getElementById("plane");
+const btn = document.getElementById("startBtn");
 
 let smoothX = 0;
+let baseOrbit = 20; // initial angle from HTML
 
-// ask permission on first tap (important for mobile)
-window.addEventListener("click", async () => {
+btn.onclick = async () => {
 
+    // iPhone permission
     if (typeof DeviceOrientationEvent.requestPermission === "function") {
         try {
             const res = await DeviceOrientationEvent.requestPermission();
-            if (res !== "granted") return;
+            if (res !== "granted") {
+                alert("Permission denied");
+                return;
+            }
         } catch(e) {
+            alert("Permission error");
             return;
         }
     }
 
-    startGyro();
-}, { once: true });
-
-function startGyro(){
+    btn.style.display = "none";
 
     window.addEventListener("deviceorientation", (event) => {
 
         let tiltX = event.gamma || 0; // LEFT / RIGHT
 
-        // smooth motion
+        // 🔥 smooth like ball program
         smoothX = smoothX * 0.9 + tiltX * 0.1;
 
-        // limit tilt
-        let rotY = Math.max(-50, Math.min(50, smoothX));
+        // 🔥 same logic as ball (add to base)
+        let rotation = baseOrbit + smoothX;
 
-        // 🎯 apply tilt (left/right)
-        viewer.cameraOrbit = `${20 + rotY}deg 75deg 105%`;
+        // limit rotation
+        rotation = Math.max(-40, Math.min(80, rotation));
+
+        // apply tilt
+        viewer.cameraOrbit = `${rotation}deg 75deg 105%`;
 
     });
-}
+};
 </script>
 
 </body>
