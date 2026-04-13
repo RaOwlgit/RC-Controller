@@ -30,11 +30,11 @@ body {
     padding-top: 50px;
 }
 
-/* ✅ plane size same */
 model-viewer {
     height: 250px;
     width: 250px;
-    transition: transform 0.1s linear; /* smooth tilt */
+    transition: transform 0.1s linear;
+    pointer-events: none; 
 }
 </style>
 </head>
@@ -47,7 +47,10 @@ model-viewer {
         autoplay
         disable-zoom
         camera-controls="false"
-        touch-action="none">
+        touch-action="none"
+        camera-orbit="0deg 75deg 105%"   
+        min-camera-orbit="40deg 75deg 105%"
+        max-camera-orbit="40deg 80deg 105%">
     </model-viewer>
 </div>
 
@@ -58,7 +61,7 @@ const plane = document.getElementById("plane");
 
 let smoothX = 0;
 
-// auto start (no button)
+// iPhone permission
 if (typeof DeviceOrientationEvent.requestPermission === "function") {
     document.body.addEventListener("click", async () => {
         await DeviceOrientationEvent.requestPermission();
@@ -69,13 +72,12 @@ window.addEventListener("deviceorientation", (event) => {
 
     let tiltX = event.gamma || 0;
 
-    // smooth like your ball code
+    // smooth motion
     smoothX = smoothX * 0.9 + tiltX * 0.1;
 
-    // limit tilt
     let roll = Math.max(-45, Math.min(45, smoothX));
 
-    // ✈️ REAL TILT (rotate Z like aircraft roll)
+    // ✈️ tilt only (no manual rotation possible)
     plane.style.transform = `rotateZ(${roll}deg)`;
 
 });
