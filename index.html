@@ -1,118 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plane Gyro Control</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+<title>Plane Gyro Tilt</title>
 
-        body {
-            background-color: orange;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-        .model-container {
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            padding-top: 50px;
-        }
+body {
+    background-color: orange;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
 
-        model-viewer {
-            height: 250px;
-            width: 250px;
-        }
+.model-container {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 50px;
+}
 
-        #startBtn{
-            position:fixed;
-            bottom:20px;
-            left:50%;
-            transform:translateX(-50%);
-            padding:10px 20px;
-            border:none;
-            border-radius:6px;
-            background:#22c55e;
-            color:white;
-            font-size:16px;
-            z-index:10;
-        }
-    </style>
+/* ✅ plane size same */
+model-viewer {
+    height: 250px;
+    width: 250px;
+    transition: transform 0.1s linear; /* smooth tilt */
+}
+</style>
 </head>
 
 <body>
 
 <div class="model-container">
     <model-viewer id="plane"
-        alt="3d model"
         src="plane.glb"
-        autoplay 
-        touch-action="none" 
+        autoplay
         disable-zoom
-        camera-orbit="20deg 75deg 105%"
-        min-camera-orbit="auto 75deg auto"
-        max-camera-orbit="auto 75deg auto">   
+        camera-controls="false"
+        touch-action="none">
     </model-viewer>
 </div>
 
-<button id="startBtn">Start</button>
-
-<!-- model-viewer -->
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.2.0/model-viewer.min.js"></script>
 
 <script>
-const viewer = document.getElementById("plane");
-const btn = document.getElementById("startBtn");
+const plane = document.getElementById("plane");
 
 let smoothX = 0;
-let baseOrbit = 20; // initial angle from HTML
 
-btn.onclick = async () => {
+// auto start (no button)
+if (typeof DeviceOrientationEvent.requestPermission === "function") {
+    document.body.addEventListener("click", async () => {
+        await DeviceOrientationEvent.requestPermission();
+    }, { once: true });
+}
 
-    // iPhone permission
-    if (typeof DeviceOrientationEvent.requestPermission === "function") {
-        try {
-            const res = await DeviceOrientationEvent.requestPermission();
-            if (res !== "granted") {
-                alert("Permission denied");
-                return;
-            }
-        } catch(e) {
-            alert("Permission error");
-            return;
-        }
-    }
+window.addEventListener("deviceorientation", (event) => {
 
-    btn.style.display = "none";
+    let tiltX = event.gamma || 0;
 
-    window.addEventListener("deviceorientation", (event) => {
+    // smooth like your ball code
+    smoothX = smoothX * 0.9 + tiltX * 0.1;
 
-        let tiltX = event.gamma || 0; // LEFT / RIGHT
+    // limit tilt
+    let roll = Math.max(-45, Math.min(45, smoothX));
 
-        // 🔥 smooth like ball program
-        smoothX = smoothX * 0.9 + tiltX * 0.1;
+    // ✈️ REAL TILT (rotate Z like aircraft roll)
+    plane.style.transform = `rotateZ(${roll}deg)`;
 
-        // 🔥 same logic as ball (add to base)
-        let rotation = baseOrbit + smoothX;
-
-        // limit rotation
-        rotation = Math.max(-40, Math.min(80, rotation));
-
-        // apply tilt
-        viewer.cameraOrbit = `${rotation}deg 75deg 105%`;
-
-    });
-};
+});
 </script>
 
 </body>
