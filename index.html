@@ -1,129 +1,92 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-widthdiv, initial-scale=1.0">
+    <title>Document</title>
 
-<style>
-body{
-    margin:0;
-    overflow:hidden;
-    background:black;
-    color:white;
-    font-family: Arial;
-}
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-/* BALL */
-#ball{
-    position:absolute;
-    border-radius:50%;
-    outline:#FFF dashed 10px;
-    background: radial-gradient(#fff7a7,#ffd100);
-    width:120px;
-    height:120px;
-    left:50%;
-    top:50%;
-    transform:translate(-50%,-50%);
-    transition: left 0.05s linear, top 0.05s linear;
-    pointer-events:none;
-}
+        body {
+            background-color: orange;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
 
-/* INFO */
-#report_box{
-    position:fixed;
-    top:10px;
-    left:10px;
-    font-size:14px;
-}
+        .model-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 50px;
+        }
 
-/* BUTTON */
-#startBtn{
-    position:fixed;
-    bottom:20px;
-    left:50%;
-    transform:translateX(-50%);
-    padding:12px 25px;
-    font-size:16px;
-    border:none;
-    border-radius:8px;
-    background:#22c55e;
-    color:white;
-}
-</style>
+        model-viewer {
+            height: 250px;
+            width: 250px;
+        }
+    </style>
 </head>
-
 <body>
 
-<div id="report_box">Click Start</div>
-<div id="ball"></div>
-<button id="startBtn">Start Sensor</button>
+<div class="model-container">
+    <model-viewer id="plane"
+        alt="3d model"
+        src="plane.glb"
+        autoplay 
+        touch-action="pan-y"
+        disable-zoom
+        camera-orbit="25deg 75deg 105%"
+        min-camera-orbit="auto 75deg auto"
+        max-camera-orbit="auto 75deg auto">   
+    </model-viewer>
+</div>
+
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.2.0/model-viewer.min.js"></script>
 
 <script>
-const ball = document.getElementById("ball");
-const report_box = document.getElementById("report_box");
-const startBtn = document.getElementById("startBtn");
+const viewer = document.getElementById("plane");
 
-let posX = window.innerWidth / 2;
-let posY = window.innerHeight / 2;
-const speed = 0.5;
+let smoothX = 0;
 
-// clamp function
-function clamp(v, min, max){
-    return Math.max(min, Math.min(max, v));
-}
+// ask permission on first tap (important for mobile)
+window.addEventListener("click", async () => {
 
-// start button
-startBtn.onclick = async () => {
-
-    // iPhone permission
     if (typeof DeviceOrientationEvent.requestPermission === "function") {
-        try{
+        try {
             const res = await DeviceOrientationEvent.requestPermission();
-            if(res !== "granted"){
-                alert("Permission denied");
-                return;
-            }
-        }catch(e){
-            alert("Permission error");
+            if (res !== "granted") return;
+        } catch(e) {
             return;
         }
     }
 
-    startTracking();
-};
+    startGyro();
+}, { once: true });
 
-function startTracking(){
-
-    startBtn.style.display = "none";
+function startGyro(){
 
     window.addEventListener("deviceorientation", (event) => {
 
-        let tiltX = event.gamma || 0; // left/right
-        let tiltY = event.beta || 0;  // forward/back
+        let tiltX = event.gamma || 0; // LEFT / RIGHT
 
-        // move ball
-        posX += tiltX * speed;
-        posY += tiltY * speed;
+        // smooth motion
+        smoothX = smoothX * 0.9 + tiltX * 0.1;
 
-        let maxX = window.innerWidth - ball.offsetWidth;
-        let maxY = window.innerHeight - ball.offsetHeight;
+        // limit tilt
+        let rotY = Math.max(-50, Math.min(50, smoothX));
 
-        posX = clamp(posX, 0, maxX);
-        posY = clamp(posY, 0, maxY);
+        // 🎯 apply tilt (left/right)
+        viewer.cameraOrbit = `${20 + rotY}deg 75deg 105%`;
 
-        ball.style.left = posX + "px";
-        ball.style.top = posY + "px";
-
-        // 🔥 SEND TO NODEMCU
-        let motorSpeed = Math.abs(tiltY);
-
-        fetch(`http://192.168.4.1/control?tilt=${tiltX}&speed=${motorSpeed}`)
-        .catch(()=>{}); // ignore errors
-
-        // debug
-        report_box.innerHTML = `
-            TiltX: ${tiltX.toFixed(2)}<br>
-            Speed: ${motorSpeed.toFixed(2)}
-        `;
     });
 }
 </script>
