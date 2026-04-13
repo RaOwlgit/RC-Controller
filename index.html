@@ -3,16 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>Plane Gyro Tilt</title>
-
 <style>
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
-
 body {
     background-color: orange;
     height: 100vh;
@@ -20,7 +17,6 @@ body {
     justify-content: center;
     align-items: center;
 }
-
 .model-container {
     width: 100vw;
     height: 100vh;
@@ -28,9 +24,8 @@ body {
     justify-content: center;
     align-items: flex-start;
     padding-top: 50px;
-    perspective: 800px; /* 🔥 important for 3D tilt */
+    perspective: 800px;
 }
-
 model-viewer {
     height: 250px;
     width: 250px;
@@ -39,11 +34,9 @@ model-viewer {
 }
 </style>
 </head>
-
 <body>
-
 <div class="model-container">
-    <model-viewer id="plane"
+   <model-viewer id="plane"
         src="plane.glb"
         autoplay
         disable-zoom
@@ -54,12 +47,9 @@ model-viewer {
         max-camera-orbit="40deg 80deg 105%">
     </model-viewer>
 </div>
-
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.2.0/model-viewer.min.js"></script>
-
 <script>
 const plane = document.getElementById("plane");
-
 let smoothX = 0;
 
 // iPhone permission
@@ -70,8 +60,7 @@ if (typeof DeviceOrientationEvent.requestPermission === "function") {
 }
 
 window.addEventListener("deviceorientation", (event) => {
-
-    let tiltX = event.gamma || 0; // ONLY left/right
+    let tiltX = event.gamma || 0; // left/right tilt
 
     // smooth
     smoothX = smoothX * 0.9 + tiltX * 0.1;
@@ -79,14 +68,12 @@ window.addEventListener("deviceorientation", (event) => {
     // limit tilt
     let bank = Math.max(-40, Math.min(40, smoothX));
 
-    // ✈️ REAL AIRCRAFT TILT (NOT SPIN)
+    // ✈️ rotateZ = banking/rolling (wing up/down) — NOT rotateY (that spins!)
     plane.style.transform = `
-        rotateY(${bank}deg) 
+        rotateZ(${-bank}deg)
         rotateX(5deg)
     `;
-
 });
 </script>
-
 </body>
 </html>
