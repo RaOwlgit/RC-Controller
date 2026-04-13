@@ -3,77 +3,226 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Plane Gyro Tilt</title>
+<title>Plane Tilt</title>
 <style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
 body {
-    background-color: orange;
+    background: linear-gradient(180deg, #87CEEB 0%, #b0e0ff 60%, #e8f4f8 100%);
     height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    font-family: monospace;
+}
+
+/* Horizon line */
+.horizon {
+    position: fixed;
+    width: 100%;
+    height: 2px;
+    background: rgba(255,255,255,0.3);
+    top: 50%;
+    pointer-events: none;
+}
+
+.model-container {
+    width: 280px;
+    height: 280px;
+    perspective: 900px;
     display: flex;
     justify-content: center;
     align-items: center;
 }
-.model-container {
-    width: 100vw;
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    padding-top: 50px;
-    perspective: 800px;
-}
+
 model-viewer {
-    height: 250px;
-    width: 250px;
-    transition: transform 0.1s linear;
+    width: 280px;
+    height: 280px;
     pointer-events: none;
+    will-change: transform;
+}
+
+.hud {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.55);
+    border-radius: 14px;
+    padding: 12px 24px;
+    display: flex;
+    gap: 28px;
+    align-items: center;
+}
+
+.hud-item {
+    text-align: center;
+}
+
+.hud-label {
+    color: #aaa;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.hud-value {
+    color: #00ff88;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+/* Bank indicator arc */
+.bank-indicator {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.bank-indicator svg {
+    filter: drop-shadow(0 0 4px rgba(0,0,0,0.3));
+}
+
+.permission-btn {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.8);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    padding: 18px 32px;
+    font-size: 16px;
+    font-family: monospace;
+    cursor: pointer;
+    display: none;
+    z-index: 99;
 }
 </style>
 </head>
 <body>
+
+<div class="horizon"></div>
+
+<!-- Bank angle arc indicator -->
+<div class="bank-indicator">
+    <svg width="160" height="90" viewBox="0 0 160 90">
+        <!-- Arc -->
+        <path d="M 20 80 A 60 60 0 0 1 140 80" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+        <!-- Tick marks -->
+        <line x1="80" y1="20" x2="80" y2="30" stroke="white" stroke-width="2" opacity="0.6"/>
+        <line x1="38" y1="38" x2="44" y2="46" stroke="white" stroke-width="1.5" opacity="0.4"/>
+        <line x1="122" y1="38" x2="116" y2="46" stroke="white" stroke-width="1.5" opacity="0.4"/>
+        <!-- Needle -->
+        <line id="needle" x1="80" y1="80" x2="80" y2="24"
+              stroke="#00ff88" stroke-width="2.5" stroke-linecap="round"
+              transform-origin="80 80"/>
+    </svg>
+</div>
+
 <div class="model-container">
-   <model-viewer id="plane"
+     <model-viewer id="plane"
         src="plane.glb"
         autoplay
         disable-zoom
         camera-controls="false"
         touch-action="none"
         camera-orbit="0deg 75deg 105%"   
-        min-camera-orbit="40deg 75deg 105%"
+        min-camera-orbit="120deg 75deg 105%"
         max-camera-orbit="40deg 80deg 105%">
     </model-viewer>
 </div>
+
+<div class="hud">
+    <div class="hud-item">
+        <div class="hud-label">Bank</div>
+        <div class="hud-value" id="bankVal">0°</div>
+    </div>
+    <div class="hud-item">
+        <div class="hud-label">Pitch</div>
+        <div class="hud-value" id="pitchVal">0°</div>
+    </div>
+</div>
+
+<button class="permission-btn" id="permBtn">✈️ Tap to Enable Gyro</button>
+
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.2.0/model-viewer.min.js"></script>
 <script>
-const plane = document.getElementById("plane");
-let smoothX = 0;
+const plane   = document.getElementById("plane");
+const needle  = document.getElementById("needle");
+const bankVal = document.getElementById("bankVal");
+const pitchVal= document.getElementById("pitchVal");
+const permBtn = document.getElementById("permBtn");
 
-// iPhone permission
-if (typeof DeviceOrientationEvent.requestPermission === "function") {
-    document.body.addEventListener("click", async () => {
-        await DeviceOrientationEvent.requestPermission();
-    }, { once: true });
+let smoothBank  = 0;   // rotateZ
+let smoothPitch = 0;   // rotateX
+let hasGyro = false;
+
+// Smoothing — higher = slower/smoother, lower = snappier
+const SMOOTH = 0.92;
+const BANK_LIMIT  = 45;
+const PITCH_LIMIT = 20;
+
+function update(rawBank, rawPitch) {
+    smoothBank  = smoothBank  * SMOOTH + rawBank  * (1 - SMOOTH);
+    smoothPitch = smoothPitch * SMOOTH + rawPitch * (1 - SMOOTH);
+
+    const bank  = Math.max(-BANK_LIMIT,  Math.min(BANK_LIMIT,  smoothBank));
+    const pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, smoothPitch));
+
+    // Z = roll/bank, X = pitch
+    plane.style.transform = `rotateZ(${-bank}deg) rotateX(${pitch * 0.4}deg)`;
+
+    // HUD
+    bankVal.textContent  = bank.toFixed(1)  + "°";
+    pitchVal.textContent = pitch.toFixed(1) + "°";
+
+    // Needle: rotate around arc center (80,80)
+    needle.setAttribute("transform", `rotate(${bank}, 80, 80)`);
+
+    requestAnimationFrame(() => {});
 }
 
-window.addEventListener("deviceorientation", (event) => {
-    let tiltX = event.gamma || 0; // left/right tilt
+function startGyro() {
+    window.addEventListener("deviceorientation", (e) => {
+        hasGyro = true;
+        const rawBank  = e.gamma || 0;  // left/right tilt
+        const rawPitch = e.beta  ? (e.beta - 45) : 0; // forward/back adjusted
+        update(rawBank, rawPitch);
+    });
+}
 
-    // smooth
-    smoothX = smoothX * 0.9 + tiltX * 0.1;
+// iOS permission
+if (typeof DeviceOrientationEvent !== "undefined" &&
+    typeof DeviceOrientationEvent.requestPermission === "function") {
+    permBtn.style.display = "block";
+    permBtn.addEventListener("click", async () => {
+        const res = await DeviceOrientationEvent.requestPermission();
+        if (res === "granted") {
+            permBtn.style.display = "none";
+            startGyro();
+        }
+    });
+} else {
+    startGyro();
+}
 
-    // limit tilt
-    let bank = Math.max(-40, Math.min(40, smoothX));
-
-    // ✈️ rotateZ = banking/rolling (wing up/down) — NOT rotateY (that spins!)
-    plane.style.transform = `
-        rotateZ(${-bank}deg)
-        rotateX(5deg)
-    `;
-});
+// Fallback loop if no gyro fires
+setTimeout(() => {
+    if (!hasGyro) {
+        // Demo mode: gentle auto-bank
+        let t = 0;
+        setInterval(() => {
+            t += 0.02;
+            update(Math.sin(t) * 20, Math.sin(t * 0.5) * 5);
+        }, 16);
+    }
+}, 1000);
 </script>
 </body>
 </html>
+
